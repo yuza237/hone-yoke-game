@@ -1,0 +1,171 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>骨よけゲーム</title>
+<style>
+:root { color-scheme: light dark; --bg: light-dark(#f4f5f8,#101116); --panel: light-dark(#ffffff,#1a1b23); --text: light-dark(#20212a,#f3f3f7); --muted: light-dark(#666b78,#a8abba); --line: light-dark(#d9dce5,#383a47); --accent: #e33b55; }
+* { box-sizing: border-box; }
+body { margin: 0; font-family: system-ui,-apple-system,"Segoe UI",sans-serif; background: var(--bg); color: var(--text); }
+#app { min-height: 100vh; width: 100%; background: var(--bg); padding: 22px 16px 28px; }
+main { width: min(900px,100%); margin: 0 auto; }
+header { display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:16px; }
+h1 { font-size: clamp(22px,4vw,32px); margin:0; letter-spacing:.02em; }
+.tag { color:var(--muted); font-size:13px; }
+.hero { margin:0 0 18px; padding:24px clamp(16px,4vw,32px); border-radius:16px; background:radial-gradient(circle at 85% 15%,#ff657f55,transparent 34%),linear-gradient(135deg,#1b1b2b,#29203c 58%,#431e32); color:#fff; border:1px solid #ffffff20; box-shadow:0 12px 30px #0002; }
+.hero .eyebrow { margin:0 0 7px; color:#ffb6c2; font-size:12px; font-weight:800; letter-spacing:.18em; }
+.hero h2 { margin:0; font-size:clamp(28px,5vw,44px); line-height:1.15; }
+.hero p { max-width:600px; margin:10px 0 0; color:#e4e2ef; line-height:1.65; font-size:14px; }
+.section-title { margin:22px 0 10px; font-size:18px; }
+.feature-grid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:10px; margin:0 0 16px; }
+.feature { padding:13px; border-radius:11px; background:var(--panel); border:1px solid var(--line); }
+.feature strong { display:block; margin-bottom:4px; font-size:14px; }
+.feature p { margin:0; color:var(--muted); font-size:12px; line-height:1.55; }
+.game-shell { background:#08090e; border:2px solid #4a4d5b; border-radius:14px; padding:10px; box-shadow:0 14px 35px #0002; }
+canvas { display:block; width:100%; height:auto; border-radius:7px; background:#05060a; touch-action:none; }
+.hud { display:flex; justify-content:space-between; gap:12px; flex-wrap:wrap; padding:10px 4px 2px; color:#f5f5fa; font-weight:700; font-size:14px; }
+.hp-track { width:150px; height:10px; border:1px solid #f5d36a; display:inline-block; vertical-align:middle; margin-left:7px; }
+#hpbar { height:100%; width:100%; background:#f5d34f; transition:width .12s; }
+.controls { display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap; margin-top:14px; }
+button { font:inherit; font-weight:700; border:0; border-radius:9px; padding:11px 18px; cursor:pointer; background:var(--accent); color:white; }
+button:focus-visible { outline:3px solid #ffbf4a; outline-offset:3px; }
+button.secondary { background:var(--panel); color:var(--text); border:1px solid var(--line); }
+.hint { color:var(--muted); font-size:14px; line-height:1.6; }
+.instructions { margin-top:16px; background:var(--panel); border:1px solid var(--line); border-radius:12px; padding:14px 16px; }
+.instructions h2 { margin:0 0 6px; font-size:16px; }
+.instructions p { margin:4px 0; font-size:14px; line-height:1.65; }
+#overlay { position:relative; }
+@media (max-width:600px) { .feature-grid { grid-template-columns:1fr; } }
+@media (max-width:520px) { #app { padding:14px 10px 20px; } .hp-track { width:100px; } .controls { align-items:stretch; } .controls button { flex:1; } }
+</style>
+</head>
+<body>
+<div id="app">
+<main>
+<header><h1>骨よけゲーム</h1><span class="tag">DODGE GAME</span></header>
+<section class="hero"><p class="eyebrow">ARCADE SURVIVAL</p><h2>骨よけゲーム</h2><p>迫りくる骨を避けて、できるだけ長く生き残ろう。90秒ノーダメージを達成すると、さらに難しいデスモードが解放される。</p></section>
+<h2 class="section-title">ゲームをプレイ</h2>
+<div class="game-shell">
+<canvas id="game" width="800" height="500" aria-label="矢印キーでハートを動かして骨を避けるゲーム"></canvas>
+<div class="hud"><span>HP <span id="hptext">20 / 20</span><span class="hp-track"><span id="hpbar" style="display:block"></span></span></span><span>生存時間 <span id="time">0.0</span> 秒</span><span>難易度 <span id="level">1</span></span><span id="itemhint">アイテム：緑の＋／青い盾</span><span id="shieldstatus">盾なし</span></div>
+</div>
+<div class="controls"><button id="start">ゲームスタート</button><button id="retry" class="secondary">リトライ</button><button id="mode" class="secondary" disabled>デスモード（未解放）</button><span class="hint">操作：↑ ↓ ← → キー</span></div>
+<h2 class="section-title">ゲームのポイント</h2>
+<div class="feature-grid"><article class="feature"><strong>矢印キーで移動</strong><p>上下左右に動いて、飛んでくる骨を避けよう。</p></article><article class="feature"><strong>アイテムを活用</strong><p>回復・盾・スピードアップを使って生き残ろう。</p></article><article class="feature"><strong>デスモードに挑戦</strong><p>ノーダメージで90秒生き残ると解放。大きな骨と追跡アイテムが待ち受ける。</p></article></div>
+<section class="instructions"><h2>詳しい遊び方</h2><p>赤いハートを矢印キーで動かし、回転しながら飛んでくる骨を避けよう。</p><p>通常モードでは緑の＋でHPが5回復し、青い盾で次の1回のダメージを防げる。黄色いSを取ると5秒間移動速度が上がる。ノーダメージで90秒生き残るとデスモードが解放される。デスモードでは大きな骨だけが出現し、盾は出ず、ゆっくり追いかけてくる専用アイテムを取るとハートが10秒間1.5倍になる。</p></section>
+</main>
+</div>
+<script>
+(() => {
+ const canvas = document.getElementById('game');
+ const ctx = canvas.getContext('2d');
+ const hpText = document.getElementById('hptext');
+ const hpBar = document.getElementById('hpbar');
+ const timeText = document.getElementById('time');
+ const levelText = document.getElementById('level');
+ const startBtn = document.getElementById('start');
+ const retryBtn = document.getElementById('retry');
+ const modeBtn = document.getElementById('mode');
+ const W = canvas.width, H = canvas.height;
+ const keys = new Set();
+ const shieldText=document.getElementById('shieldstatus');
+ const itemHint=document.getElementById('itemhint');
+ let heart, bones, hp, elapsed, running, ended, lastTime, spawnClock, invulnerable, frameId, healItem, healClock, shieldItem, shieldClock, shieldActive, speedItem, speedClock, sizeItem, sizeClock, speedTimer, sizeTimer, bestTime=0, resultHits=0, resultHeals=0, resultShields=0, deathMode=false, deathModeUnlocked=false, runHits=0;
+ try { deathModeUnlocked=localStorage.getItem('darkMatterDeathModeUnlocked')==='true'; } catch(e) {}
+ function updateModeButton(){ modeBtn.disabled=!deathModeUnlocked||running; modeBtn.textContent=!deathModeUnlocked?'デスモード（未解放）':deathMode?'デスモード：ON':'デスモード：OFF'; }
+ function reset(startNow=false) {
+   if (frameId) cancelAnimationFrame(frameId);
+   heart = {x:W/2,y:H-85,r:10,speed:245}; bones=[]; hp=20; elapsed=0; running=startNow; ended=false; lastTime=0; spawnClock=0; invulnerable=0; healItem=null; healClock=5; shieldItem=null; shieldClock=13; shieldActive=false; speedItem=null; speedClock=4; sizeItem=null; sizeClock=7; speedTimer=0; sizeTimer=0; resultHits=0; resultHeals=0; resultShields=0; runHits=0;
+   keys.clear(); if(startNow){spawnBone();spawnBone();} updateHud(); draw(); startBtn.textContent = startNow ? 'プレイ中…' : 'ゲームスタート'; updateModeButton();
+   if (running) frameId=requestAnimationFrame(loop);
+ }
+ function updateHud(){ hpText.textContent=hp+' / 20'; hpBar.style.width=(hp/20*100)+'%'; timeText.textContent=elapsed.toFixed(1); levelText.textContent=(1+Math.floor(elapsed/12)); shieldText.textContent=shieldActive?'盾あり：次の1回を防御':'盾なし'; }
+ function heartPath(x,y,size){ ctx.beginPath(); ctx.moveTo(x,y+size*.8); ctx.bezierCurveTo(x-size*1.5,y-size*.1,x-size*1.2,y-size*1.25,x,y-size*.55); ctx.bezierCurveTo(x+size*1.2,y-size*1.25,x+size*1.5,y-size*.1,x,y+size*.8); ctx.closePath(); }
+ function drawBone(b){
+   ctx.save(); ctx.translate(b.x,b.y); ctx.rotate(b.angle||0); ctx.fillStyle='#f5f5f7';
+   // Bone shaft and rounded ends
+   ctx.beginPath(); ctx.roundRect(-b.w/2,-b.h/2,b.w,b.h,Math.min(b.h/2,8)); ctx.fill();
+   const r=Math.max(5,b.h*.72);
+   for(const x of [-b.w/2,b.w/2]) for(const y of [-b.h*.35,b.h*.35]) { ctx.beginPath(); ctx.arc(x,y,r,0,Math.PI*2); ctx.fill(); }
+   ctx.restore();
+ }
+ function draw(){
+   ctx.clearRect(0,0,W,H); ctx.fillStyle='#05060a'; ctx.fillRect(0,0,W,H);
+   // subtle battle arena frame
+   ctx.strokeStyle='#3d414f'; ctx.lineWidth=3; ctx.strokeRect(18,18,W-36,H-36);
+   // faint stars
+   ctx.fillStyle='#242633'; for(let i=0;i<38;i++){ const x=(i*137+41)%W, y=(i*83+29)%H; ctx.fillRect(x,y,2,2); }
+   bones.forEach(drawBone);
+   if(healItem){ctx.save();ctx.translate(healItem.x,healItem.y);ctx.fillStyle='#43e879';ctx.strokeStyle='#d1ffdf';ctx.lineWidth=2;ctx.beginPath();ctx.arc(0,0,13,0,Math.PI*2);ctx.fill();ctx.stroke();ctx.fillStyle='#073b1b';ctx.fillRect(-7,-2,14,4);ctx.fillRect(-2,-7,4,14);ctx.restore();}
+   if(shieldItem&&!deathMode){ctx.save();ctx.translate(shieldItem.x,shieldItem.y);ctx.fillStyle='#48aaff';ctx.strokeStyle='#d5f0ff';ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(0,-16);ctx.lineTo(13,-10);ctx.lineTo(11,5);ctx.lineTo(0,15);ctx.lineTo(-11,5);ctx.lineTo(-13,-10);ctx.closePath();ctx.fill();ctx.stroke();ctx.restore();}
+   if(speedItem){ctx.save();ctx.translate(speedItem.x,speedItem.y);ctx.fillStyle='#ffd447';ctx.strokeStyle='#fff0a8';ctx.lineWidth=2;ctx.beginPath();ctx.arc(0,0,12,0,Math.PI*2);ctx.fill();ctx.stroke();ctx.fillStyle='#573b00';ctx.font='bold 17px system-ui';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText('S',0,1);ctx.restore();}
+   if(sizeItem){ctx.save();ctx.translate(sizeItem.x,sizeItem.y);ctx.fillStyle='#c77dff';ctx.strokeStyle='#f0d8ff';ctx.lineWidth=2;ctx.beginPath();ctx.arc(0,0,13,0,Math.PI*2);ctx.fill();ctx.stroke();ctx.fillStyle='#fff';ctx.font='bold 16px system-ui';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText('♥',0,1);ctx.restore();}
+   if(heart && (invulnerable<=0 || Math.floor(elapsed*15)%2===0)) { heartPath(heart.x,heart.y,heart.r*(sizeTimer>0?1.5:1)); ctx.fillStyle=shieldActive?'#36a7ff':'#ff304d'; ctx.fill(); ctx.strokeStyle=shieldActive?'#bce7ff':'#ff8a9b'; ctx.lineWidth=1.5; ctx.stroke(); }
+   if(!running){
+     ctx.fillStyle='#0009'; ctx.fillRect(20,20,W-40,H-40);
+     ctx.textAlign='center'; ctx.fillStyle='#fff';
+     ctx.font='bold 32px system-ui,sans-serif'; ctx.fillText(ended?'GAME OVER':'骨よけゲーム',W/2,H/2-52);
+     ctx.font='18px system-ui,sans-serif'; ctx.fillStyle='#d6d8e1';
+     ctx.fillText(ended?`今回の生存時間：${elapsed.toFixed(1)} 秒`:'「ゲームスタート」を押して開始',W/2,H/2-14);
+     if(ended){ ctx.font='bold 17px system-ui,sans-serif'; ctx.fillStyle='#ffe27a'; ctx.fillText(`自己ベスト：${bestTime.toFixed(1)} 秒`,W/2,H/2+18); ctx.font='15px system-ui,sans-serif'; ctx.fillStyle='#d6d8e1'; ctx.fillText(`命中回数：${resultHits}　回復アイテム：${resultHeals} 個`,W/2,H/2+46); ctx.fillText('リトライしてもう一度挑戦しよう',W/2,H/2+73); }
+   }
+ }
+ function spawnBone(){
+   const level=1+Math.floor(elapsed/6); const speed=(deathMode ? 175 : 125)+Math.min(elapsed*(deathMode ? 4.2 : 3.1),deathMode ? 260 : 190)+Math.random()*45;
+   let b;
+   const fromLeft=Math.random()<.5; b={x:fromLeft?-55:W+55,y:45+Math.random()*(H-90),vx:(fromLeft?1:-1)*speed,vy:(Math.random()-.5)*45,w:deathMode?100+Math.random()*25:42+Math.random()*8,h:deathMode?22:10,angle:0,spin:(Math.random()<.5?-1:1)*(1.4+Math.random()*1.5)};
+   b.damageCooldown=0; bones.push(b);
+   const extraChance=Math.min((deathMode ? .2 : .04)+(level-1)*(deathMode ? .07 : .035),deathMode ? .7 : .35);
+   if(!deathMode&&elapsed>=6&&Math.random()<extraChance){ const yy=45+Math.random()*(H-90); const fromLeft=Math.random()<.5; bones.push({x:fromLeft?-35:W+35,y:yy,vx:(fromLeft?1:-1)*speed*.85,vy:(Math.random()-.5)*30,w:42+Math.random()*8,h:10,angle:0,spin:(Math.random()<.5?-1:1)*2.2}); }
+ }
+ function collision(b){
+   // Check collision against the entire rotated bone, including its rounded ends.
+   const dx=heart.x-b.x, dy=heart.y-b.y, hr=heart.r*(sizeTimer>0?1.5:1);
+   const c=Math.cos(-(b.angle||0)), s=Math.sin(-(b.angle||0));
+   const lx=dx*c-dy*s, ly=dx*s+dy*c;
+   const halfW=b.w/2, halfH=b.h/2;
+   const qx=Math.max(Math.abs(lx)-halfW,0), qy=Math.max(Math.abs(ly)-halfH,0);
+   const shaftHit=qx*qx+qy*qy<=hr*hr;
+   const endR=Math.max(5,b.h*.72)+hr;
+   const endHit=[[-halfW,-b.h*.35],[-halfW,b.h*.35],[halfW,-b.h*.35],[halfW,b.h*.35]].some(([ex,ey])=>Math.hypot(lx-ex,ly-ey)<=endR);
+   return shaftHit||endHit;
+ }
+ function endGame(){ running=false; ended=true; bestTime=Math.max(bestTime,elapsed); startBtn.textContent='もう一度スタート'; updateHud(); updateModeButton(); draw(); }
+ function loop(ts){
+   if(!running)return;
+   if(!lastTime)lastTime=ts; const dt=Math.min((ts-lastTime)/1000,.035); lastTime=ts; elapsed+=dt; spawnClock+=dt; invulnerable=Math.max(0,invulnerable-dt);
+   if(elapsed>=90&&runHits===0&&!deathModeUnlocked){deathModeUnlocked=true;try{localStorage.setItem('darkMatterDeathModeUnlocked','true');}catch(e){} updateModeButton();}
+   const level=1+Math.floor(elapsed/6); const spawnEvery=Math.max(deathMode ? .24 : .42,(deathMode ? 1.05 : 1.35)-Math.floor(elapsed/6)*(deathMode ? .1 : .07));
+   while(spawnClock>=spawnEvery){ spawnClock-=spawnEvery; spawnBone(); }
+   speedTimer=Math.max(0,speedTimer-dt); sizeTimer=Math.max(0,sizeTimer-dt); heart.speed=245*(speedTimer>0?1.6:1);
+   healClock-=dt;
+   if(!healItem&&healClock<=0){healItem={x:65+Math.random()*(W-130),y:65+Math.random()*(H-130),r:13};healClock=8+Math.random()*5;}
+   if(!speedItem&&speedClock<=0){speedItem={x:65+Math.random()*(W-130),y:65+Math.random()*(H-130),r:12};speedClock=8+Math.random()*4;}
+   speedClock-=dt;
+   if(deathMode){shieldItem=null;shieldActive=false;sizeClock-=dt;if(!sizeItem&&sizeClock<=0){sizeItem={x:65+Math.random()*(W-130),y:65+Math.random()*(H-130),r:13,vx:0,vy:0};sizeClock=10+Math.random()*5;} if(sizeItem){const tx=heart.x-sizeItem.x,ty=heart.y-sizeItem.y,d=Math.hypot(tx,ty)||1,follow=Math.min(95*dt,d);sizeItem.x+=tx/d*follow;sizeItem.y+=ty/d*follow;}}
+   else {shieldClock-=dt;if(!shieldItem&&!shieldActive&&shieldClock<=0){shieldItem={x:65+Math.random()*(W-130),y:65+Math.random()*(H-130),r:15};shieldClock=15+Math.random()*9;}sizeItem=null;sizeClock=7;}
+   let dx=0,dy=0; if(keys.has('ArrowLeft'))dx--; if(keys.has('ArrowRight'))dx++; if(keys.has('ArrowUp'))dy--; if(keys.has('ArrowDown'))dy++;
+   if(dx&&dy){dx*=.7071;dy*=.7071;}
+   heart.x=Math.max(35,Math.min(W-35,heart.x+dx*heart.speed*dt)); heart.y=Math.max(35,Math.min(H-35,heart.y+dy*heart.speed*dt));
+   for(let i=bones.length-1;i>=0;i--){ const b=bones[i]; b.x+=b.vx*dt; b.y+=b.vy*dt; b.angle+=b.spin*dt; if(b.x<-180||b.x>W+180||b.y<-180||b.y>H+180){bones.splice(i,1);continue;} if(collision(b)){ if(shieldActive){shieldActive=false;invulnerable=.12;} else if(invulnerable<=0){hp--;resultHits++;runHits++;invulnerable=.72;} bones.splice(i,1); if(hp<=0){hp=0;endGame();return;} } }
+   if(healItem&&Math.hypot(heart.x-healItem.x,heart.y-healItem.y)<heart.r+healItem.r){hp=Math.min(20,hp+5);resultHeals++;healItem=null;healClock=8+Math.random()*5;}
+   if(shieldItem&&!deathMode&&Math.hypot(heart.x-shieldItem.x,heart.y-shieldItem.y)<heart.r+shieldItem.r){shieldActive=true;resultShields++;shieldItem=null;shieldClock=15+Math.random()*9;}
+   if(speedItem&&Math.hypot(heart.x-speedItem.x,heart.y-speedItem.y)<heart.r+speedItem.r){speedItem=null;speedTimer=5;speedClock=8+Math.random()*4;}
+   if(sizeItem&&Math.hypot(heart.x-sizeItem.x,heart.y-sizeItem.y)<heart.r*(sizeTimer>0?1.5:1)+sizeItem.r){sizeItem=null;sizeTimer=10;sizeClock=10+Math.random()*5;}
+   itemHint.textContent=deathMode?'デスモードアイテム：追跡する♥（10秒間サイズ1.5倍）':'アイテム：緑の＋／青い盾／黄色のS（速度UP）';
+   updateHud(); draw(); frameId=requestAnimationFrame(loop);
+ }
+ document.addEventListener('keydown',e=>{ if(['ArrowUp','ArrowDown','ArrowLeft','ArrowRight'].includes(e.key)){e.preventDefault();keys.add(e.key);} if(e.key==='Enter'&&!running) reset(true); });
+ document.addEventListener('keyup',e=>keys.delete(e.key));
+ window.addEventListener('blur',()=>keys.clear());
+ startBtn.addEventListener('click',()=>{if(!running) reset(true);});
+ retryBtn.addEventListener('click',()=>reset(true));
+ modeBtn.addEventListener('click',()=>{if(deathModeUnlocked&&!running){deathMode=!deathMode;updateModeButton();draw();}});
+ // Keep arrow-key input from scrolling the page while the game is active.
+ reset(false);
+ updateModeButton();
+})();
+</script>
+</body>
+</html>
