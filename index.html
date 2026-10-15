@@ -36,8 +36,14 @@ button.secondary { background:var(--panel); color:var(--text); border:1px solid 
 .instructions h2 { margin:0 0 6px; font-size:16px; }
 .instructions p { margin:4px 0; font-size:14px; line-height:1.65; }
 #overlay { position:relative; }
+.touch-controls { display:none; grid-template-columns:repeat(3,64px); grid-template-rows:repeat(2,56px); justify-content:center; gap:7px; margin:14px auto 4px; touch-action:none; }
+.touch-controls button { padding:0; font-size:24px; user-select:none; -webkit-user-select:none; touch-action:none; }
+.touch-controls button[data-dir="ArrowUp"] { grid-column:2; grid-row:1; }
+.touch-controls button[data-dir="ArrowLeft"] { grid-column:1; grid-row:2; }
+.touch-controls button[data-dir="ArrowDown"] { grid-column:2; grid-row:2; }
+.touch-controls button[data-dir="ArrowRight"] { grid-column:3; grid-row:2; }
 @media (max-width:600px) { .feature-grid { grid-template-columns:1fr; } }
-@media (max-width:520px) { #app { padding:14px 10px 20px; } .hp-track { width:100px; } .controls { align-items:stretch; } .controls button { flex:1; } }
+@media (max-width:520px) { #app { padding:14px 10px 20px; } .hp-track { width:100px; } .controls { align-items:stretch; } .controls button { flex:1; } .touch-controls { display:grid; } }
 </style>
 </head>
 <body>
@@ -50,6 +56,7 @@ button.secondary { background:var(--panel); color:var(--text); border:1px solid 
 <canvas id="game" width="800" height="500" aria-label="矢印キーでハートを動かして骨を避けるゲーム"></canvas>
 <div class="hud"><span>HP <span id="hptext">20 / 20</span><span class="hp-track"><span id="hpbar" style="display:block"></span></span></span><span>生存時間 <span id="time">0.0</span> 秒</span><span>難易度 <span id="level">1</span></span><span id="itemhint">アイテム：緑の＋／青い盾</span><span id="shieldstatus">盾なし</span></div>
 </div>
+<div class="touch-controls" aria-label="スマホ用移動ボタン"><button type="button" class="secondary" data-dir="ArrowUp" aria-label="上へ">↑</button><button type="button" class="secondary" data-dir="ArrowLeft" aria-label="左へ">←</button><button type="button" class="secondary" data-dir="ArrowDown" aria-label="下へ">↓</button><button type="button" class="secondary" data-dir="ArrowRight" aria-label="右へ">→</button></div>
 <div class="controls"><button id="start">ゲームスタート</button><button id="retry" class="secondary">リトライ</button><button id="mode" class="secondary" disabled>デスモード（未解放）</button><span class="hint">操作：↑ ↓ ← → キー</span></div>
 <h2 class="section-title">ゲームのポイント</h2>
 <div class="feature-grid"><article class="feature"><strong>矢印キーで移動</strong><p>上下左右に動いて、飛んでくる骨を避けよう。</p></article><article class="feature"><strong>アイテムを活用</strong><p>回復・盾・スピードアップを使って生き残ろう。</p></article><article class="feature"><strong>デスモードに挑戦</strong><p>ノーダメージで90秒生き残ると解放。大きな骨と追跡アイテムが待ち受ける。</p></article></div>
@@ -67,6 +74,7 @@ button.secondary { background:var(--panel); color:var(--text); border:1px solid 
  const startBtn = document.getElementById('start');
  const retryBtn = document.getElementById('retry');
  const modeBtn = document.getElementById('mode');
+ const touchButtons = document.querySelectorAll('.touch-controls button[data-dir]');
  const W = canvas.width, H = canvas.height;
  const keys = new Set();
  const shieldText=document.getElementById('shieldstatus');
@@ -158,6 +166,14 @@ button.secondary { background:var(--panel); color:var(--text); border:1px solid 
  }
  document.addEventListener('keydown',e=>{ if(['ArrowUp','ArrowDown','ArrowLeft','ArrowRight'].includes(e.key)){e.preventDefault();keys.add(e.key);} if(e.key==='Enter'&&!running) reset(true); });
  document.addEventListener('keyup',e=>keys.delete(e.key));
+ touchButtons.forEach(btn=>{
+   const dir=btn.dataset.dir;
+   const release=()=>keys.delete(dir);
+   btn.addEventListener('pointerdown',e=>{e.preventDefault();keys.add(dir);try{btn.setPointerCapture(e.pointerId);}catch(err){}});
+   btn.addEventListener('pointerup',release);
+   btn.addEventListener('pointercancel',release);
+   btn.addEventListener('lostpointercapture',release);
+ });
  window.addEventListener('blur',()=>keys.clear());
  startBtn.addEventListener('click',()=>{if(!running) reset(true);});
  retryBtn.addEventListener('click',()=>reset(true));
